@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping("/http-basic")
 public class BasicAuthController {
 
     /**
@@ -28,10 +28,7 @@ public class BasicAuthController {
         ));
     }
 
-    /**
-     * Demonstração do @PreAuthorize a nível de método (requer @EnableMethodSecurity).
-     * Complementa as regras do SecurityFilterChain com controle mais granular.
-     */
+
     @GetMapping("/settings")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, String>> settings() {
