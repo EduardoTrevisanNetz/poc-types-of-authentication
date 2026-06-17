@@ -2,7 +2,8 @@ package com.example.poctypesofauthentication.config;
 
 import com.example.poctypesofauthentication.filter.ApiKeyAuthFilter;
 import com.example.poctypesofauthentication.filter.JwtAuthFilter;
-import lombok.RequiredArgsConstructor;
+import com.example.poctypesofauthentication.repository.ApiKeyRepository;
+import com.example.poctypesofauthentication.service.JwtService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -22,19 +23,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@RequiredArgsConstructor
 public class SecurityConfig {
-
-    private final JwtAuthFilter jwtAuthFilter;
-    private final ApiKeyAuthFilter apiKeyAuthFilter;
 
     // =========================================================
     // Order 1 — BASIC AUTH  (/http-basic/**)
     // =========================================================
-    /**
-     * Simples de implementar, porém manda usuário e senha em toda requisição
-     * e bate no banco a cada chamada.
-     */
     @Bean
     @Order(1)
     public SecurityFilterChain basicAuthFilterChain(HttpSecurity http) throws Exception {
@@ -52,23 +45,9 @@ public class SecurityConfig {
     // =========================================================
     // Order 2 — JWT  (/jwt/**)
     // =========================================================
-    /**
-     * O que fazemos MANUALMENTE aqui vs oauth2ResourceServer().jwt():
-     *
-     *  MANUAL (nosso JwtAuthFilter)           | oauth2ResourceServer().jwt()
-     * ----------------------------------------|----------------------------------------------
-     *  JwtAuthFilter (OncePerRequestFilter)   | BearerTokenAuthenticationFilter (automático)
-     *  JwtService.extractUsername()           | NimbusJwtDecoder.decode()       (automático)
-     *  JwtService.isTokenValid()              | JwtAuthenticationProvider       (automático)
-     *  Monta UsernamePasswordAuthToken manual | Monta JwtAuthenticationToken    (automático)
-     *  Precisa de UserDetailsService          | Não precisa — lê claims do JWT  (automático)
-     *
-     * O endpoint POST /jwt/login (emitir token) NÃO existe no oauth2ResourceServer —
-     * isso é papel do Authorization Server (ex: Keycloak, Spring Authorization Server).
-     */
     @Bean
     @Order(2)
-    public SecurityFilterChain jwtFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain jwtFilterChain(HttpSecurity http, JwtService jwtService) throws Exception {
         return http
                 .securityMatcher("/jwt/**")
                 .csrf(AbstractHttpConfigurer::disable)
@@ -76,47 +55,43 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/jwt/login").permitAll()
                         .anyRequest().authenticated())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new JwtAuthFilter(jwtService), UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
-//    // =========================================================
-//    // Order 3 — OAUTH2  (/oauth2/**)
-//    // =========================================================
-//    @Bean
-//    @Order(3)
-//    public SecurityFilterChain oauth2FilterChain(HttpSecurity http) throws Exception { ... }
-
     // =========================================================
-    // Order 4 — API KEY  (/apikey/**)
+    // Order 3 — API KEY  (/apikey/**)
     // =========================================================
-    /**
-     * Diferenças em relação ao JWT:
-     *  - Não tem expiração — a chave vale até ser revogada
-     *  - Não é auto-contida — precisa consultar o repositório a cada request (não é stateless puro)
-     *  - Ideal para integrações B2B onde o cliente é uma máquina, não um usuário
-     */
     @Bean
-    @Order(4)
-    public SecurityFilterChain apiKeyFilterChain(HttpSecurity http) throws Exception {
+    @Order(3)
+    public SecurityFilterChain apiKeyFilterChain(HttpSecurity http, ApiKeyRepository apiKeyRepository) throws Exception {
         return http
                 .securityMatcher("/apikey/**")
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .anyRequest().authenticated())
-                .addFilterBefore(apiKeyAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new ApiKeyAuthFilter(apiKeyRepository), UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
-//    // =========================================================
-//    // Order 6 — PÚBLICO  (/public/**)
-//    // =========================================================
-//    @Bean
-//    @Order(6)
-//    public SecurityFilterChain publicFilterChain(HttpSecurity http) throws Exception { ... }
+    // =========================================================
+    // Order 4 — SOCIAL LOGIN  (/social/**)
+    // =========================================================
+    @Bean
+    @Order(4)
+    public SecurityFilterChain socialLoginFilterChain(HttpSecurity http) throws Exception {
+        return http
+                .securityMatcher("/social/**", "/oauth2/authorization/**", "/login/oauth2/**")
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().authenticated())
+                .oauth2Login(oauth2 -> oauth2
+                        .loginPage("/oauth2/authorization/github")
+                        .defaultSuccessUrl("/social/profile", true))
+                .build();
+    }
 
-    /** Necessário para o JWTController autenticar username/password no /jwt/login */
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();

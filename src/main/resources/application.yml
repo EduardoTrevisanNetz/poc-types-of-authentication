@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: poc-types-of-authentication
+
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: YOUR_GITHUB_CLIENT_ID
+            client-secret: YOUR_GITHUB_CLIENT_SECRET
+            scope:
+              - read:user
+              - user:email
