@@ -10,7 +10,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -38,7 +37,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         final List<GrantedAuthority> authorities;
 
         try {
-            username = jwtService.extractUsername(token);
+            if (!jwtService.isAccessToken(token)) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            username    = jwtService.extractUsername(token);
             authorities = jwtService.extractAuthorities(token);
         } catch (Exception e) {
             filterChain.doFilter(request, response);

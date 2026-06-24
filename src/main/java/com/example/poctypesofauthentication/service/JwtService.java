@@ -18,15 +18,26 @@ import java.util.stream.Collectors;
 public class JwtService {
 
     private static final String SECRET = "SECRET-SUPER-SECRETAMENTE-SECRETA-DA-SILVA";
-    private static final long EXPIRATION_MS = 1000L * 60 * 60; // 1 hora
 
-    public String generateToken(UserDetails userDetails) {
+    private static final long ACCESS_TOKEN_EXPIRATION_MS = 1000L * 60 * 15;
+    private static final long REFRESH_TOKEN_EXPIRATION_MS = 1000L * 60 * 60 * 24 * 7;
+
+    public String generateAccessToken(UserDetails userDetails) {
+        return buildToken(userDetails, ACCESS_TOKEN_EXPIRATION_MS, "access");
+    }
+
+    public String generateRefreshToken(UserDetails userDetails) {
+        return buildToken(userDetails, REFRESH_TOKEN_EXPIRATION_MS, "refresh");
+    }
+
+    private String buildToken(UserDetails userDetails, long expirationMs, String tokenType) {
         return Jwts.builder()
                 .subject(userDetails.getUsername())
                 .claim("roles", userDetails.getAuthorities().stream()
                         .map(a -> a.getAuthority()).toList())
+                .claim("type", tokenType)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + EXPIRATION_MS))
+                .expiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -43,12 +54,15 @@ public class JwtService {
                 .collect(Collectors.toList());
     }
 
-    public boolean isTokenValid(String token, UserDetails userDetails) {
-        String username = extractUsername(token);
-        return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+    public boolean isAccessToken(String token) {
+        return "access".equals(parseClaims(token).get("type", String.class));
     }
 
-    private boolean isTokenExpired(String token) {
+    public boolean isRefreshToken(String token) {
+        return "refresh".equals(parseClaims(token).get("type", String.class));
+    }
+
+    public boolean isTokenExpired(String token) {
         return parseClaims(token).getExpiration().before(new Date());
     }
 
