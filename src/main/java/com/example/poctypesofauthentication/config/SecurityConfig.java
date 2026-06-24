@@ -1,6 +1,7 @@
 package com.example.poctypesofauthentication.config;
 
 import com.example.poctypesofauthentication.filter.ApiKeyAuthFilter;
+import com.example.poctypesofauthentication.filter.ApiKeyRateLimitFilter;
 import com.example.poctypesofauthentication.filter.JwtAuthFilter;
 import com.example.poctypesofauthentication.repository.ApiKeyRepository;
 import com.example.poctypesofauthentication.service.JwtService;
@@ -71,7 +72,8 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .anyRequest().authenticated())
-                .addFilterBefore(new ApiKeyAuthFilter(apiKeyRepository), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new ApiKeyRateLimitFilter(), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new ApiKeyAuthFilter(apiKeyRepository), ApiKeyRateLimitFilter.class)
                 .build();
     }
 
