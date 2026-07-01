@@ -37,11 +37,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         final List<GrantedAuthority> authorities;
 
         try {
-            if (!jwtService.isAccessToken(token)) {
-                filterChain.doFilter(request, response);
-                return;
-            }
-
             username    = jwtService.extractUsername(token);
             authorities = jwtService.extractAuthorities(token);
         } catch (Exception e) {

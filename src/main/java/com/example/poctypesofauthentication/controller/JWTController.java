@@ -35,9 +35,7 @@ public class JWTController {
 
         UserDetails userDetails = (UserDetails) auth.getPrincipal();
         String accessToken  = jwtService.generateAccessToken(userDetails);
-        String refreshToken = jwtService.generateRefreshToken(userDetails);
-
-        refreshTokenService.store(refreshToken);
+        String refreshToken = refreshTokenService.generate(userDetails.getUsername());
 
         return ResponseEntity.ok(Map.of(
                 "access_token",  accessToken,
@@ -55,43 +53,25 @@ public class JWTController {
             return ResponseEntity.badRequest().body(Map.of("error", "refresh_token ausente"));
         }
 
-        try {
-            if (!jwtService.isRefreshToken(refreshToken)) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "Token inválido: não é um refresh token"));
-            }
-
-            if (jwtService.isTokenExpired(refreshToken)) {
-                refreshTokenService.revoke(refreshToken);
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "Refresh token expirado, faça login novamente"));
-            }
-
-            if (!refreshTokenService.isValid(refreshToken)) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "Refresh token revogado ou inválido"));
-            }
-
-            String username = jwtService.extractUsername(refreshToken);
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-
-            // Rotation: revoga o token antigo e emite um novo par
-            refreshTokenService.revoke(refreshToken);
-            String newAccessToken  = jwtService.generateAccessToken(userDetails);
-            String newRefreshToken = jwtService.generateRefreshToken(userDetails);
-            refreshTokenService.store(newRefreshToken);
-
-            return ResponseEntity.ok(Map.of(
-                    "access_token",  newAccessToken,
-                    "refresh_token", newRefreshToken,
-                    "token_type",    "Bearer",
-                    "expires_in",    "900"
-            ));
-
-        } catch (Exception e) {
+        if (!refreshTokenService.isValid(refreshToken)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Token inválido ou malformado"));
+                    .body(Map.of("error", "Refresh token inválido ou expirado"));
         }
+
+        String username = refreshTokenService.extractUsername(refreshToken);
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+        // Rotation: revoga o token antigo e emite um novo par
+        refreshTokenService.revoke(refreshToken);
+        String newAccessToken  = jwtService.generateAccessToken(userDetails);
+        String newRefreshToken = refreshTokenService.generate(username);
+
+        return ResponseEntity.ok(Map.of(
+                "access_token",  newAccessToken,
+                "refresh_token", newRefreshToken,
+                "token_type",    "Bearer",
+                "expires_in",    "900"
+        ));
     }
 
     /**

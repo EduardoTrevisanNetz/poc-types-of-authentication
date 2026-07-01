@@ -20,24 +20,14 @@ public class JwtService {
     private static final String SECRET = "SECRET-SUPER-SECRETAMENTE-SECRETA-DA-SILVA";
 
     private static final long ACCESS_TOKEN_EXPIRATION_MS = 1000L * 60 * 15;
-    private static final long REFRESH_TOKEN_EXPIRATION_MS = 1000L * 60 * 60 * 24 * 7;
 
     public String generateAccessToken(UserDetails userDetails) {
-        return buildToken(userDetails, ACCESS_TOKEN_EXPIRATION_MS, "access");
-    }
-
-    public String generateRefreshToken(UserDetails userDetails) {
-        return buildToken(userDetails, REFRESH_TOKEN_EXPIRATION_MS, "refresh");
-    }
-
-    private String buildToken(UserDetails userDetails, long expirationMs, String tokenType) {
         return Jwts.builder()
                 .subject(userDetails.getUsername())
                 .claim("roles", userDetails.getAuthorities().stream()
-                        .map(a -> a.getAuthority()).toList())
-                .claim("type", tokenType)
+                        .map(GrantedAuthority::getAuthority).toList())
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + expirationMs))
+                .expiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRATION_MS))
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -52,18 +42,6 @@ public class JwtService {
         return roles.stream()
                 .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toList());
-    }
-
-    public boolean isAccessToken(String token) {
-        return "access".equals(parseClaims(token).get("type", String.class));
-    }
-
-    public boolean isRefreshToken(String token) {
-        return "refresh".equals(parseClaims(token).get("type", String.class));
-    }
-
-    public boolean isTokenExpired(String token) {
-        return parseClaims(token).getExpiration().before(new Date());
     }
 
     private Claims parseClaims(String token) {
